@@ -1,0 +1,128 @@
+# Upgraded Streamlit Budget Overrun Detection App
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+
+st.set_page_config(page_title="Budget Overrun Detection", layout="wide")
+
+# --- Helper Functions ---
+def generate_synthetic_data():
+    np.random.seed(42)
+    n_projects = 300
+    estimated_budget = np.random.uniform(10000, 500000, n_projects)
+    actual_spent = estimated_budget * np.random.normal(1.0, 0.2, n_projects)
+    project_types = np.random.choice(['Construction', 'IT', 'Consulting', 'Research'], size=n_projects)
+    duration_months = np.random.randint(3, 24, n_projects)
+
+    df = pd.DataFrame({
+        'Estimated_Budget': estimated_budget,
+        'Actual_Spent': actual_spent,
+        'Project_Type': project_types,
+        'Duration_Months': duration_months
+    })
+    return df
+
+def preprocess_data(df):
+    df['Budget_Overrun'] = (df['Actual_Spent'] > df['Estimated_Budget']).astype(int)
+    df_encoded = pd.get_dummies(df, columns=['Project_Type'], drop_first=True)
+    return df_encoded
+
+# --- Sidebar ---
+st.sidebar.title("Upload or Generate Data")
+uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=["csv"])
+use_synthetic = st.sidebar.checkbox("Use Synthetic Data", value=True)
+
+# --- Data Handling ---
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+    st.success("✅ Data uploaded successfully.")
+elif use_synthetic:
+    df = generate_synthetic_data()
+    st.info("ℹ️ Using synthetic sample data.")
+else:
+    st.warning("⚠️ Please upload a CSV or enable synthetic data.")
+    st.stop()
+
+# --- Preprocess ---
+df_encoded = preprocess_data(df)
+
+# --- Layout ---
+st.title("💸 Budget Overrun Detection & Risk Analysis")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("🔎 Project Data Preview")
+    st.dataframe(df.head(10))
+
+with col2:
+    st.subheader("📈 Budget vs Actual Spending")
+    fig, ax = plt.subplots()
+    scatter = ax.scatter(df['Estimated_Budget'], df['Actual_Spent'], 
+                         c=df['Budget_Overrun'], cmap='coolwarm', alpha=0.7)
+    ax.plot([0, df['Estimated_Budget'].max()], [0, df['Estimated_Budget'].max()], 'k--', lw=2)
+    ax.set_xlabel("Estimated Budget ($)")
+    ax.set_ylabel("Actual Spending ($)")
+    ax.set_title("Budget vs Actual")
+    ax.grid(True)
+    st.pyplot(fig)
+
+# --- Model ---
+X = df_encoded.drop(['Budget_Overrun', 'Actual_Spent'], axis=1)
+y = df_encoded['Budget_Overrun']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+clf = DecisionTreeClassifier(max_depth=5, random_state=42)
+clf.fit(X_train, y_train)
+
+y_pred = clf.predict(X_test)
+y_prob = clf.predict_proba(X_test)[:, 1]  # Risk score
+
+# --- Results ---
+st.subheader("🧠 Model Evaluation Metrics")
+
+col3, col4, col5 = st.columns(3)
+col3.metric("Accuracy", f"{clf.score(X_test, y_test)*100:.2f}%")
+col4.metric("Total Projects", len(df))
+col5.metric("Overrun Rate", f"{(df['Budget_Overrun'].mean())*100:.2f}%")
+
+st.subheader("🗒️ Confusion Matrix and Report")
+st.text("Confusion Matrix")
+st.text(confusion_matrix(y_test, y_pred))
+
+st.text("Classification Report")
+st.text(classification_report(y_test, y_pred))
+
+# --- Show Predictions with Risk Score ---
+st.subheader("🔮 Budget Overrun Risk Scores")
+
+results = X_test.copy()
+results['Predicted_Overrun'] = y_pred
+results['Risk_Score (%)'] = (y_prob * 100).round(2)
+
+st.dataframe(results.head(10))
+
+# --- Download Results ---
+@st.cache_data
+def convert_df_to_csv(df):
+    return df.to_csv(index=False).encode('utf-8')
+
+csv = convert_df_to_csv(results)
+
+st.download_button(
+    label="📥 Download Predictions as CSV",
+    data=csv,
+    file_name='budget_overrun_predictions.csv',
+    mime='text/csv',
+)
+
+# --- Footer ---
+st.markdown("---")
+st.caption("Built with ❤️ using Streamlit, Numpy, Pandas, Scikit-learn")
+
