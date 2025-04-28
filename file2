@@ -1,0 +1,114 @@
+# Streamlit Budget Overrun Detection App
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
+
+st.set_page_config(page_title="Budget Overrun Detection", layout="centered")
+
+# Title
+st.title("💸 Budget Overrun Detection App")
+
+# Sidebar
+st.sidebar.header("Upload Your Project Data")
+uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+
+# Instructions
+st.markdown("""
+This app detects **budget overruns** in your projects.  
+Upload a CSV with at least these columns:
+- `Estimated_Budget`
+- `Actual_Spent`
+- (Optional) `Project_Type`
+- (Optional) `Duration_Months`
+""")
+
+# If no file uploaded, create synthetic data
+def generate_synthetic_data():
+    np.random.seed(42)
+    n_projects = 300
+    estimated_budget = np.random.uniform(10000, 500000, n_projects)
+    actual_spent = estimated_budget * np.random.normal(1.0, 0.2, n_projects)
+    project_types = np.random.choice(['Construction', 'IT', 'Consulting', 'Research'], size=n_projects)
+    duration_months = np.random.randint(3, 24, n_projects)
+
+    df = pd.DataFrame({
+        'Estimated_Budget': estimated_budget,
+        'Actual_Spent': actual_spent,
+        'Project_Type': project_types,
+        'Duration_Months': duration_months
+    })
+    return df
+
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+    st.success("File uploaded successfully!")
+else:
+    st.info("No file uploaded. Using synthetic data.")
+    df = generate_synthetic_data()
+
+# Show data
+st.subheader("🔎 Project Data Preview")
+st.dataframe(df.head())
+
+# Add Overrun Column
+df['Budget_Overrun'] = (df['Actual_Spent'] > df['Estimated_Budget']).astype(int)
+
+# Plot
+st.subheader("📊 Budget vs Actual Spending")
+fig, ax = plt.subplots()
+scatter = ax.scatter(df['Estimated_Budget'], df['Actual_Spent'], 
+                     c=df['Budget_Overrun'], cmap='coolwarm', alpha=0.6)
+ax.plot([0, df['Estimated_Budget'].max()], [0, df['Estimated_Budget'].max()], 'k--', lw=2)
+ax.set_xlabel("Estimated Budget ($)")
+ax.set_ylabel("Actual Spending ($)")
+ax.set_title("Budget vs Actual with Overrun Highlight")
+ax.grid(True)
+st.pyplot(fig)
+
+# Modeling
+st.subheader("🧠 Budget Overrun Prediction Model")
+
+# Preprocessing
+df_encoded = pd.get_dummies(df, columns=['Project_Type'], drop_first=True)
+
+# Split data
+X = df_encoded.drop(['Budget_Overrun', 'Actual_Spent'], axis=1)
+y = df_encoded['Budget_Overrun']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Train model
+clf = DecisionTreeClassifier(max_depth=5, random_state=42)
+clf.fit(X_train, y_train)
+
+# Predict
+y_pred = clf.predict(X_test)
+
+# Evaluation
+st.subheader("📋 Model Evaluation")
+
+st.text("Confusion Matrix")
+st.text(confusion_matrix(y_test, y_pred))
+
+st.text("Classification Report")
+st.text(classification_report(y_test, y_pred))
+
+st.success(f"Model Accuracy: {clf.score(X_test, y_test) * 100:.2f}%")
+
+🚀 How to Run:
+
+    Save the above code in a file named app.py
+
+    Install Streamlit if you haven't:
+
+pip install streamlit
+
+    Run the app:
+
+streamlit run app.py
+
