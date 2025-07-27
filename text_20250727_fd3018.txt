@@ -1,0 +1,12 @@
+Budget Category: Marketing
+Allocated Amount: $5000.00
+Total Expenses: $5300.00
+Current Balance: $-100.00
+⚠️ BUDGET OVERRUN! Exceeded by $300.00
+
+Transaction History:
+1. Initial: $5000.00 - Initial allocation
+2. Income: $200.00 - Sponsorship
+3. Expense: $1500.00 - Google Ads
+4. Expense: $800.00 - Social Media Campaign
+5. Expense: $3000.00 - Influencer Partnership
